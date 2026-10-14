@@ -11,6 +11,23 @@ for (const k of ['MONGO_URI', 'JWT_SECRET']) {
   if (!process.env[k]) { console.error(`Missing ${k} in environment`); process.exit(1); }
 }
 
+// Clean the URI: remove accidental spaces, line breaks and wrapping quotes
+const MONGO_URI = process.env.MONGO_URI.trim().replace(/^["']|["']$/g, '');
+
+// DEBUG (safe): prints only the username, host and password length, never the password
+try {
+  const afterScheme = MONGO_URI.split('//')[1] || '';
+  const credentials = afterScheme.split('@')[0] || '';
+  const user = credentials.split(':')[0];
+  const pass = credentials.split(':').slice(1).join(':');
+  const host = afterScheme.split('@').slice(1).join('@').split('/')[0];
+  console.log('Mongo user:', user);
+  console.log('Mongo host:', host);
+  console.log('Mongo password length:', pass.length);
+} catch (e) {
+  console.log('Could not parse MONGO_URI:', e.message);
+}
+
 if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'demo-key' || process.env.GEMINI_API_KEY === 'your-key-from-aistudio.google.com') {
   console.warn('GEMINI_API_KEY missing or placeholder; using local fallback interview generation.');
 }
@@ -37,7 +54,7 @@ app.listen(port, '0.0.0.0', () => {
   console.log(`API running on :${port}`);
 
   mongoose
-    .connect(process.env.MONGO_URI)
+    .connect(MONGO_URI)
     .then(() => {
       console.log('MongoDB connected successfully');
     })
