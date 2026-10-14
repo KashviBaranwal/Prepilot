@@ -31,8 +31,18 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ message: err.status ? err.message : 'Server error' });
 });
 
-const port = process.env.PORT || 5000;
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => app.listen(port, () => console.log(`API running on :${port}`)))
-  .catch((e) => { console.error('MongoDB connection failed:', e.message); process.exit(1); });
+const port = Number(process.env.PORT) || 10000;
+
+app.listen(port, '0.0.0.0', () => {
+  console.log(`API running on :${port}`);
+
+  mongoose
+    .connect(process.env.MONGO_URI)
+    .then(() => {
+      console.log('MongoDB connected successfully');
+    })
+    .catch((e) => {
+      console.error('MongoDB connection failed:', e.message);
+      process.exit(1);
+    });
+});
