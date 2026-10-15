@@ -8,7 +8,6 @@ import authRoutes from './routes/auth.js';
 import interviewRoutes from './routes/interviews.js';
 import { apiLimiter, authLimiter } from './middleware/rateLimit.js';
 
-// Check required environment variables
 for (const k of ['MONGO_URI', 'JWT_SECRET']) {
   if (!process.env[k]) {
     console.error(`Missing ${k} in environment`);
@@ -17,19 +16,21 @@ for (const k of ['MONGO_URI', 'JWT_SECRET']) {
 }
 
 // Clean MongoDB URI
-// Removes accidental spaces, line breaks and wrapping quotes
 const MONGO_URI = process.env.MONGO_URI
   .trim()
   .replace(/^["']|["']$/g, '');
 
-// DEBUG: print only safe MongoDB information
-// Never prints the actual password
+// Safe MongoDB debug information
 try {
   const afterScheme = MONGO_URI.split('//')[1] || '';
   const credentials = afterScheme.split('@')[0] || '';
 
   const user = credentials.split(':')[0];
-  const pass = credentials.split(':').slice(1).join(':');
+
+  const pass = credentials
+    .split(':')
+    .slice(1)
+    .join(':');
 
   const host = afterScheme
     .split('@')
@@ -57,15 +58,17 @@ if (
 
 const app = express();
 
-// Correct client IPs behind Render/Vercel proxies
 app.set('trust proxy', 1);
 
-// Security middleware
 app.use(helmet());
 
-// CORS configuration
+// ------------------------------------
+// CORS CONFIGURATION
+// ------------------------------------
+
 const allowedOrigins = (
-  process.env.CLIENT_URL || 'http://localhost:5173'
+  process.env.CLIENT_URL ||
+  'http://localhost:5173'
 )
   .split(',')
   .map((origin) => origin.trim())
@@ -77,7 +80,7 @@ app.use(
   cors({
     origin: (origin, callback) => {
       // Allow requests without an Origin header
-      // such as Postman, server-to-server requests, etc.
+      // such as Postman/server-to-server requests
       if (!origin) {
         return callback(null, true);
       }
@@ -86,52 +89,104 @@ app.use(
         return callback(null, true);
       }
 
-      console.error('CORS blocked origin:', origin);
-      return callback(new Error('Not allowed by CORS'));
+      console.log('CORS blocked origin:', origin);
+
+      return callback(
+        new Error(`CORS blocked origin: ${origin}`)
+      );
     },
+
+    credentials: true,
+
+    methods: [
+      'GET',
+      'HEAD',
+      'PUT',
+      'PATCH',
+      'POST',
+      'DELETE',
+      'OPTIONS'
+    ],
+
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization'
+    ]
   })
 );
 
-// Parse JSON requests
+// ------------------------------------
+// BODY PARSER
+// ------------------------------------
+
 app.use(express.json({ limit: '20kb' }));
 
-// Health check
+// ------------------------------------
+// HEALTH CHECK
+// ------------------------------------
+
 app.get('/health', (req, res) => {
   res.json({ ok: true });
 });
 
-// API routes
+// ------------------------------------
+// API ROUTES
+// ------------------------------------
+
 app.use('/api', apiLimiter);
 
-app.use('/api/auth', authLimiter, authRoutes);
+app.use(
+  '/api/auth',
+  authLimiter,
+  authRoutes
+);
 
-app.use('/api/interviews', interviewRoutes);
+app.use(
+  '/api/interviews',
+  interviewRoutes
+);
 
-// Global error handler
+// ------------------------------------
+// ERROR HANDLER
+// ------------------------------------
+
 app.use((err, req, res, next) => {
   console.error(err);
 
-  res
-    .status(err.status || 500)
-    .json({
-      message: err.status ? err.message : 'Server error',
-    });
+  res.status(err.status || 500).json({
+    message: err.status
+      ? err.message
+      : 'Server error'
+  });
 });
 
-// Render provides the PORT environment variable
-const port = Number(process.env.PORT) || 10000;
+// ------------------------------------
+// SERVER
+// ------------------------------------
 
-// Start server
-app.listen(port, '0.0.0.0', () => {
-  console.log(`API running on :${port}`);
+const port =
+  Number(process.env.PORT) || 10000;
 
-  mongoose
-    .connect(MONGO_URI)
-    .then(() => {
-      console.log('MongoDB connected successfully');
-    })
-    .catch((e) => {
-      console.error('MongoDB connection failed:', e.message);
-      process.exit(1);
-    });
-});
+app.listen(
+  port,
+  '0.0.0.0',
+  () => {
+    console.log(`API running on :${port}`);
+
+    mongoose
+      .connect(MONGO_URI)
+      .then(() => {
+        console.log(
+          'MongoDB connected successfully'
+        );
+      })
+      .catch((e) => {
+        console.error(
+          'MongoDB connection failed:',
+          e.message
+        );
+
+        process.exit(1);
+      });
+  }
+);
